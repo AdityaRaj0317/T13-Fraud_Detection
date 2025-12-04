@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Fraud Analyzer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .risk-low { background-color: #d1fae5; color: #065f46; border-color: #34d399; }
+        .risk-medium { background-color: #fef3c7; color: #b45309; border-color: #fbbf24; }
+        .risk-high { background-color: #fee2e2; color: #991b1b; border-color: #f87171; }
+        .card-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-2xl bg-white p-6 sm:p-8 rounded-xl card-shadow border border-gray-100">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">
+            💳 Transaction Fraud Analyzer
+        </h1>
+        <p class="text-gray-500 mb-8 text-center">
+            Enter a User ID and an IP Address to simulate a transaction and check the real-time risk score.
+        </p>
+
+        <!-- Input Form -->
+        <form id="transactionForm" class="space-y-6">
+            <div>
+                <label for="userId" class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+                <input type="text" id="userId" value="user_456" required 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                       placeholder="e.g., user_123">
+            </div>
+            <div>
+                <label for="ipAddress" class="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+                <input type="text" id="ipAddress" value="8.8.8.8" required 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                       placeholder="e.g., 203.0.113.45">
+                <p class="text-xs text-gray-400 mt-1">Try changing this to see location mismatch fraud, e.g., 104.149.199.141</p>
+            </div>
+            <button type="submit" id="analyzeButton"
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                Analyze Transaction Risk
+            </button>
+        </form>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden text-center mt-6">
+            <div class="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-indigo-500 rounded-full" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p class="text-gray-500 mt-2">Checking API...</p>
+        </div>
+
+        <!-- Output Display -->
+        <div id="resultsContainer" class="hidden mt-8 pt-6 border-t border-gray-200 space-y-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Analysis Results</h2>
+            
+            <!-- Risk Score and Level -->
+            <div id="riskHeader" class="p-4 rounded-xl border-l-4 font-semibold text-lg flex justify-between items-center">
+                <span>Risk Level: <span id="riskLevelOutput"></span></span>
+                <span>Score: <span id="riskScoreOutput" class="text-xl font-extrabold"></span> / 100</span>
+            </div>
+
+            <!-- Current Location -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm font-semibold text-gray-700 mb-1">Current Transaction Details:</p>
+                <ul class="text-sm text-gray-600 space-y-1">
+                    <li><span class="font-medium">IP Address:</span> <span id="currentIpOutput"></span></li>
+                    <li><span class="font-medium">Location:</span> <span id="currentLocationOutput"></span> (<span id="currentCountryOutput"></span>)</li>
+                    <li><span class="font-medium">Timestamp:</span> <span id="currentTimestampOutput"></span></li>
+                </ul>
+            </div>
+
+            <!-- Last Transaction Details (Hidden if first transaction) -->
+            <div id="lastTransactionBlock" class="hidden bg-blue-50 p-4 rounded-lg">
+                <p class="text-sm font-semibold text-blue-800 mb-1">Previous Transaction:</p>
+                <ul class="text-sm text-blue-700 space-y-1">
+                    <li><span class="font-medium">IP Address:</span> <span id="lastIpOutput"></span></li>
+                    <li><span class="font-medium">Location:</span> <span id="lastLocationOutput"></span> (<span id="lastCountryOutput"></span>)</li>
+                    <li><span class="font-medium">Timestamp:</span> <span id="lastTimestampOutput"></span></li>
+                </ul>
+            </div>
+
+            <!-- Reasons -->
+            <div class="p-4 bg-yellow-50 rounded-lg">
+                <p class="text-sm font-semibold text-yellow-800 mb-2">Risk Factors Identified:</p>
+                <ul id="reasonsList" class="list-disc list-inside text-sm text-yellow-700 space-y-1 pl-4">
+                    <!-- Reasons will be injected here -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden mt-6 p-4 rounded-lg bg-red-100 border border-red-400 text-red-700 font-medium">
+            <!-- Error messages will be injected here -->
+        </div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('transactionForm');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const lastTransactionBlock = document.getElementById('lastTransactionBlock');
+        const riskHeader = document.getElementById('riskHeader');
+        const reasonsList = document.getElementById('reasonsList');
+
+        /**
+         * Simple utility for exponential backoff retries.
+         */
+        async function fetchWithRetry(url, options, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed:`, error);
+                    if (i === maxRetries - 1) throw error; 
+                    // Wait before retrying (1s, 2s, 4s)
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                }
+            }
+        }
+
+        /**
+         * Clears all output fields and resets the UI state.
+         */
+        function resetUI() {
+            resultsContainer.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            lastTransactionBlock.classList.add('hidden');
+            riskHeader.className = 'p-4 rounded-xl border-l-4 font-semibold text-lg flex justify-between items-center';
+            reasonsList.innerHTML = '';
+            document.getElementById('analyzeButton').disabled = true;
+        }
+
+        /**
+         * Updates the UI with the analysis results.
+         * @param {object} data - The JSON response from the API.
+         */
+        function displayResults(data) {
+            const riskLevel = data.risk_level.toLowerCase();
+            const riskScore = data.risk_score;
+
+            // 1. Set Risk Header Style and Content
+            riskHeader.classList.add(`risk-${riskLevel}`);
+            document.getElementById('riskLevelOutput').textContent = data.risk_level;
+            document.getElementById('riskScoreOutput').textContent = riskScore.toFixed(2);
+
+            // 2. Display Current Transaction Details
+            document.getElementById('currentIpOutput').textContent = data.current_ip;
+            document.getElementById('currentLocationOutput').textContent = data.current_location.city;
+            document.getElementById('currentCountryOutput').textContent = data.current_location.country;
+            document.getElementById('currentTimestampOutput').textContent = new Date(data.current_timestamp).toLocaleString();
+            
+            // 3. Display Last Transaction Details (if available)
+            if (data.last_transaction) {
+                lastTransactionBlock.classList.remove('hidden');
+                document.getElementById('lastIpOutput').textContent = data.last_transaction.ip_address;
+                document.getElementById('lastLocationOutput').textContent = data.last_transaction.location.city;
+                document.getElementById('lastCountryOutput').textContent = data.last_transaction.location.country;
+                document.getElementById('lastTimestampOutput').textContent = new Date(data.last_transaction.timestamp).toLocaleString();
+            }
+
+            // 4. Display Reasons
+            if (data.reasons && data.reasons.length > 0) {
+                data.reasons.forEach(reason => {
+                    const li = document.createElement('li');
+                    li.textContent = reason;
+                    reasonsList.appendChild(li);
+                });
+            } else {
+                 const li = document.createElement('li');
+                 li.textContent = 'No significant risk factors identified.';
+                 reasonsList.appendChild(li);
+            }
+
+            resultsContainer.classList.remove('hidden');
+        }
+
+        /**
+         * Main form submission handler.
+         */
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resetUI();
+            errorMessage.textContent = '';
+            
+            const userId = document.getElementById('userId').value.trim();
+            const ipAddress = document.getElementById('ipAddress').value.trim();
+
+            const payload = {
+                user_id: userId,
+                ip_address: ipAddress
+            };
+
+            const apiUrl = 'http://127.0.0.1:5000/analyze_transaction';
+            
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    errorMessage.textContent = `API Error: ${data.error || 'Unknown error occurred.'}`;
+                    errorMessage.classList.remove('hidden');
+                }
+
+            } catch (error) {
+                console.error('Fetch operation failed:', error);
+                errorMessage.textContent = 'Could not connect to the API. Please ensure the Python script is running in PowerShell.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                document.getElementById('analyzeButton').disabled = false;
+            }
+        });
+        
+        // Initial setup for the button
+        document.getElementById('analyzeButton').disabled = false;
+
+    </script>
+</body>
+</html>
