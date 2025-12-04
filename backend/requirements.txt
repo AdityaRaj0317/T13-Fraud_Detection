@@ -1,0 +1,9 @@
+Flask==3.0.3
+redis==5.0.1
+geoip2==4.7.0
+
+fastapi
+uvicorn
+pandas
+openpyxl
+python-multipart
