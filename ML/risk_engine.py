@@ -146,6 +146,12 @@ class RiskEngine:
 # 3. DEMO EXECUTION (Hackathon Deliverables)
 # ==========================================
 
+# ... [Keep your Imports, generate_user_history, and RiskEngine class EXACTLY as they are] ...
+
+# ==========================================
+# 3. DEMO EXECUTION (Updated for Richer Output)
+# ==========================================
+
 # A. Setup History
 history_df = generate_user_history()
 engine = RiskEngine(history_df)
@@ -153,60 +159,62 @@ engine = RiskEngine(history_df)
 print("--- DEMO STARTING ---\n")
 
 # SCENARIO 1: Normal Login
-# User logging in from Delhi (Usual place) at 2 PM (Usual time)
 login_1 = {
     'user_id': 'user_123', 
     'hour_of_day': 14, 
     'location': 'Delhi', 
     'device': 'Chrome', 
+    'ip': '192.168.1.5',         # Added IP
     'failed_attempts_last_5min': 0
 }
 result_1 = engine.calculate_risk(login_1)
-print(f"Scenario 1 (Normal): {login_1}")
-print(f"Result: {result_1}\n")
 
 # SCENARIO 2: Suspicious (Medium Risk)
-# User logging in from Russia (New Location) at 3 AM (Unusual Time)
 login_2 = {
     'user_id': 'user_123', 
     'hour_of_day': 3, 
-    'location': 'Moscow', # Never seen before
-    'device': 'Tor Browser', # Never seen before
+    'location': 'Moscow', 
+    'device': 'Tor Browser', 
+    'ip': '45.12.19.99',         # Added Suspicious IP
     'failed_attempts_last_5min': 0
 }
 result_2 = engine.calculate_risk(login_2)
-print(f"Scenario 2 (Suspicious): {login_2}")
-print(f"Result: {result_2}\n")
 
 # SCENARIO 3: Brute Force Attack (High Risk)
-# User from Usual place but with 10 failed attempts just now
 login_3 = {
     'user_id': 'user_123', 
     'hour_of_day': 14, 
     'location': 'Delhi', 
     'device': 'Chrome', 
-    'failed_attempts_last_5min': 15 # VELOCITY ATTACK
+    'ip': '192.168.1.5',
+    'failed_attempts_last_5min': 15 
 }
 result_3 = engine.calculate_risk(login_3)
-print(f"Scenario 3 (Brute Force): {login_3}")
-print(f"Result: {result_3}\n")
 
-
+# ==========================================
+# 4. ENHANCED DASHBOARD VISUALIZATION
+# ==========================================
 def print_dashboard_summary(results):
-    print("\n" + "="*40)
-    print("      ADMIN THREAT MONITORING      ")
-    print("="*40)
-    print(f"{'TIMESTAMP':<10} | {'USER':<10} | {'RISK':<5} | {'ACTION':<15}")
-    print("-" * 45)
+    print("\n" + "="*85)
+    print(f" {'ADMIN THREAT MONITORING - LIVE FEED':^80}")
+    print("="*85)
     
-    # Fake timestamps for the demo
+    # New Header with more columns
+    header = f"{'TIME':<10} | {'USER':<10} | {'IP ADDR':<15} | {'LOC':<10} | {'DEVICE':<12} | {'RISK':<5} | {'ACTION':<10}"
+    print(header)
+    print("-" * 85)
+    
     times = ["10:05:01", "10:05:45", "10:06:12"]
     
-    for i, res in enumerate(results):
-        r_score = res['result']['risk_score']
-        action = res['result']['action'].split(" ")[0] # Just grab the first word
+    for i, item in enumerate(results):
+        # We need both the INPUT (login_data) and the OUTPUT (result)
+        login_data = item['data']
+        res = item['result']
         
-        # Color coding (ANSI escape codes)
+        r_score = res['risk_score']
+        action = res['action'].split(" ")[0] 
+        
+        # Color coding
         if r_score > 70:
             color = "\033[91m" # Red
         elif r_score > 30:
@@ -215,14 +223,17 @@ def print_dashboard_summary(results):
             color = "\033[92m" # Green
         reset = "\033[0m"
         
-        print(f"{times[i]:<10} | {'user_123':<10} | {color}{r_score:<5}{reset} | {color}{action:<15}{reset}")
-    print("="*40)
+        # Format the row
+        row = f"{times[i]:<10} | {login_data['user_id']:<10} | {login_data.get('ip', 'N/A'):<15} | {login_data['location']:<10} | {login_data['device'][:12]:<12} | {color}{r_score:<5}{reset} | {color}{action:<10}{reset}"
+        print(row)
+        
+    print("="*85)
 
-# Collect your results into a list
+# Collect inputs AND results into a list
 all_results = [
-    {'scenario': 1, 'result': result_1},
-    {'scenario': 2, 'result': result_2},
-    {'scenario': 3, 'result': result_3}
+    {'data': login_1, 'result': result_1},
+    {'data': login_2, 'result': result_2},
+    {'data': login_3, 'result': result_3}
 ]
 
 print_dashboard_summary(all_results)
